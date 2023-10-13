@@ -16,7 +16,7 @@
 
 package cc.otavia.examples.basic
 
-import cc.otavia.core.actor.{BeforeStop, StateActor}
+import cc.otavia.core.actor.{ActorCleaner, AutoCleanable, StateActor}
 import cc.otavia.core.message.Notice
 import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
@@ -32,15 +32,17 @@ object LifeCycle {
         address.notice(Start())
 
         // let garbage collector move address to ReferenceQueue
-        // than ActorThread will call AbstractActor.stop -> LifeActor.beforeStop
+        // than ActorThread will call ActorCleaner.clean()
         // than the LifeActor instance will be reclaimed by garbage collector
         address = null
+
+        println("LifeActor need be gc")
 
     }
 
     private case class Start() extends Notice
 
-    private class LifeActor extends StateActor[Start] with BeforeStop {
+    private class LifeActor extends StateActor[Start] with AutoCleanable {
 
         override protected def afterMount(): Unit = {
             println("LifeActor: afterMount")
@@ -58,9 +60,17 @@ object LifeCycle {
             println("LifeActor: afterRestart")
         }
 
+        override def cleaner(): ActorCleaner = new ActorCleaner {
+
+            println("creating actor cleaner")
+            override protected def clean(): Unit = println("clean actor resource before actor stop")
+
+        }
+
         override def continueNotice(stack: NoticeStack[Start]): Option[StackState] =
             // if occurs some error which developer is not catch, this will trigger the actor restart
-            throw new Error("")
+            // throw new Error("")
+            stack.`return`()
 
     }
 

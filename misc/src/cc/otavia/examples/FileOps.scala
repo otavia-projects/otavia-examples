@@ -59,7 +59,7 @@ object FileOps {
     case class ReadLinesReply(lines: Seq[String]) extends Reply
     case class ReadLines()                        extends Ask[ReadLinesReply]
 
-    class FileChannelActor(file: File, charset: Charset = StandardCharsets.UTF_8) extends ChannelsActor[ReadLines] {
+    private class FileChannelActor(file: File, charset: Charset = StandardCharsets.UTF_8) extends ChannelsActor[ReadLines] {
 
         override protected def init(channel: Channel): Unit = channel.pipeline.addFirst(new ReadLinesHandler(charset))
 
@@ -83,14 +83,14 @@ object FileOps {
 
     }
 
-    class OpenState extends StackState {
+    private class OpenState extends StackState {
         val openFuture: ChannelFuture = ChannelFuture()
     }
-    class LinesState extends StackState {
+    private class LinesState extends StackState {
         val linesFuture: ChannelReplyFuture = ChannelReplyFuture()
     }
 
-    class ReadLinesHandler(charset: Charset) extends ByteToMessageDecoder {
+    private class ReadLinesHandler(charset: Charset) extends ByteToMessageDecoder {
 
         private val lines              = ArrayBuffer.empty[String]
         private var currentMsgId: Long = -1;

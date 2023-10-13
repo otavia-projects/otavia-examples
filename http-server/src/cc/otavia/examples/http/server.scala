@@ -36,7 +36,7 @@ private class ServerMain() extends MainActor(Array.empty) {
     override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] = stack.state match
         case StackState.start =>
             val routers = Seq(static("/statics", Path.of("")), plain("/plaintext", "你好 otavia!".getBytes(UTF_8)))
-            val server  = system.buildActor(() => new HttpServer(system.threadPoolSize, routers))
+            val server  = system.buildActor(() => new HttpServer(system.actorWorkerSize, routers))
             server.ask(Bind(port)).suspend()
         case state: FutureState[BindReply] =>
             if (state.future.isFailed) state.future.causeUnsafe.printStackTrace()
