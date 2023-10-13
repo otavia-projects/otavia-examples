@@ -19,8 +19,7 @@ package cc.otavia.examples.basic
 import cc.otavia.core.actor.*
 import cc.otavia.core.address.Address
 import cc.otavia.core.ioc.Injectable
-import cc.otavia.core.message.{Ask, Notice, Reply, TimeoutEvent}
-import cc.otavia.core.slf4a.Appender
+import cc.otavia.core.message.{Ask, Notice, Reply}
 import cc.otavia.core.stack.StackState.FutureState
 import cc.otavia.core.stack.{AskStack, NoticeStack, ReplyFuture, StackState}
 import cc.otavia.core.system.{ActorSystem, ActorThread}
