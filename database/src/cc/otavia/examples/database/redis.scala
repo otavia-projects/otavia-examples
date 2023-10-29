@@ -16,10 +16,10 @@
 
 package cc.otavia.examples.database
 
-import cc.otavia.core.actor.ChannelsActor.{Connect, ConnectReply}
+import cc.otavia.core.actor.SocketChannelsActor.{ConnectChannel, ConnectReply}
 import cc.otavia.core.actor.{MainActor, MessageOf}
 import cc.otavia.core.address.Address
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.redis.Client
@@ -38,12 +38,12 @@ private class MainRedis(host: String, port: Int, password: String, database: Int
         stack.state match
             case StackState.start =>
                 client = system.buildActor(() => new Client())
-                val state = new FutureState[ConnectReply]()
-                client.ask(Connect(new InetSocketAddress(host, port)), state.future)
+                val state = FutureState[ConnectReply]()
+                client.ask(ConnectChannel(new InetSocketAddress(host, port), None), state.future)
                 state.suspend()
-            case state: FutureState[ConnectReply] if state.replyType.runtimeClass.equals(classOf[ConnectReply]) =>
+            case state: FutureState[ConnectReply] if state.id == 0 =>
                 logger.info("redis connected")
-                val state = new FutureState[OK]()
+                val state = FutureState[OK]()
                 client.ask(Auth(password), state.future)
                 state.suspend()
             case state: FutureState[OK] =>

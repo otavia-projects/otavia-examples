@@ -16,12 +16,13 @@
 
 package cc.otavia.examples.database
 
+import cc.otavia.core.actor.SocketChannelsActor.ConnectReply
 import cc.otavia.core.actor.{ChannelsActor, MainActor, SocketChannelsActor}
-import cc.otavia.core.stack.StackState.{FutureState, start}
+import cc.otavia.core.stack.StackState.start
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
-import cc.otavia.sql.Connection
-import cc.otavia.sql.Connection.Connect
+import cc.otavia.sql.{Authentication, Connection}
 
 @main def start(url: String, username: String, password: String): Unit =
     val system = ActorSystem()
@@ -30,7 +31,9 @@ import cc.otavia.sql.Connection.Connect
             override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] = stack.state match
                 case StackState.start =>
                     val connection = this.system.buildActor(() => new Connection())
-                    connection.ask(Connect(url, username, password)).suspend()
+                    val state      = FutureState[ConnectReply]()
+                    connection.ask(Authentication(url, username, password), state.future)
+                    state.suspend()
                 case state: FutureState[?] =>
                     if (!state.future.isSuccess)
                         state.future.causeUnsafe.printStackTrace()

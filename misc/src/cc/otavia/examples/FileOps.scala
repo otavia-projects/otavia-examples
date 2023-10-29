@@ -22,7 +22,7 @@ import cc.otavia.core.channel.message.FileReadPlan
 import cc.otavia.core.channel.{Channel, ChannelAddress, ChannelHandlerContext}
 import cc.otavia.core.message.*
 import cc.otavia.core.stack.*
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.stack.helper.{ChannelFutureState, ChannelReplyFutureState, FutureState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.*
 import cc.otavia.handler.codec.string.LineSeparator
@@ -45,7 +45,9 @@ object FileOps {
                 override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
                     stack.state match
                         case StackState.start =>
-                            fileChannelActor.ask(ReadLines()).suspend()
+                            val state = FutureState[ReadLinesReply]()
+                            fileChannelActor.ask(ReadLines(), state.future)
+                            state.suspend()
                         case futureState: FutureState[ReadLinesReply] =>
                             for (elem <- futureState.future.getNow.lines) {
                                 print(elem)
@@ -56,38 +58,29 @@ object FileOps {
 
     }
 
-    case class ReadLinesReply(lines: Seq[String]) extends Reply
-    case class ReadLines()                        extends Ask[ReadLinesReply]
+    private case class ReadLinesReply(lines: Seq[String]) extends Reply
+    private case class ReadLines()                        extends Ask[ReadLinesReply]
 
-    private class FileChannelActor(file: File, charset: Charset = StandardCharsets.UTF_8) extends ChannelsActor[ReadLines] {
+    private class FileChannelActor(file: File, charset: Charset = StandardCharsets.UTF_8)
+        extends ChannelsActor[ReadLines] {
 
-        override protected def init(channel: Channel): Unit = channel.pipeline.addFirst(new ReadLinesHandler(charset))
-
-        override protected def newChannel(): Channel = system.channelFactory.openFileChannel()
+        override protected def initFileChannel(channel: Channel): Unit = {
+            channel.pipeline.addFirst(new ReadLinesHandler(charset))
+        }
 
         override def continueAsk(stack: AskStack[ReadLines]): Option[StackState] = {
             stack.state match
                 case StackState.start =>
-                    val channel   = newChannelAndInit()
-                    val openState = new OpenState()
-                    channel.open(file, Seq(StandardOpenOption.READ), attrs = Seq.empty, openState.openFuture)
-                    openState.suspend()
-                case openState: OpenState =>
-                    val linesState = new LinesState
-                    openState.openFuture.channel.ask(FileReadPlan(-1, -1), linesState.linesFuture)
+                    openFileChannel(file, Seq(StandardOpenOption.READ), attrs = Seq.empty)
+                case openState: ChannelFutureState =>
+                    val linesState = ChannelReplyFutureState()
+                    openState.future.channel.ask(FileReadPlan(-1, -1), linesState.future)
                     linesState.suspend()
-                case linesState: LinesState =>
-                    stack.`return`(ReadLinesReply(linesState.linesFuture.getNow.asInstanceOf[Seq[String]]))
+                case linesState: ChannelReplyFutureState =>
+                    stack.`return`(ReadLinesReply(linesState.future.getNow.asInstanceOf[Seq[String]]))
 
         }
 
-    }
-
-    private class OpenState extends StackState {
-        val openFuture: ChannelFuture = ChannelFuture()
-    }
-    private class LinesState extends StackState {
-        val linesFuture: ChannelReplyFuture = ChannelReplyFuture()
     }
 
     private class ReadLinesHandler(charset: Charset) extends ByteToMessageDecoder {

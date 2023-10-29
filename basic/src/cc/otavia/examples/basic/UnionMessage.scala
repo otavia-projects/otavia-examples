@@ -19,7 +19,8 @@ package cc.otavia.examples.basic
 import cc.otavia.core.actor.{MessageOf, StateActor}
 import cc.otavia.core.address.Address
 import cc.otavia.core.message.{Ask, Notice, Reply}
-import cc.otavia.core.stack.StackState.{FutureState, start}
+import cc.otavia.core.stack.StackState.start
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{AskStack, NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 
@@ -47,19 +48,19 @@ object UnionMessage {
             stack.state match
                 case StackState.start =>
                     if (stack.notice.toggle) {
-                        val state = new FutureState[World]()
+                        val state = FutureState[World](0)
                         pongActor.ask(Hello(), state.future)
                         state.suspend()
                     } else {
-                        val state = new FutureState[Pong]()
+                        val state = FutureState[Pong](1)
                         pongActor.ask(Ping(), state.future)
                         state.suspend()
                     }
-                case state: FutureState[World] if state.replyType.runtimeClass == classOf[World] =>
+                case state: FutureState[World] if state.id == 0 =>
                     val world = state.future.getNow
                     println(s"get world ${world}")
                     stack.`return`()
-                case state: FutureState[Pong] =>
+                case state: FutureState[Pong] if state.id == 1 =>
                     val pong = state.future.getNow
                     println(s"get pong ${pong}")
                     stack.`return`()

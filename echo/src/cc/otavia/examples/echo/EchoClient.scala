@@ -17,17 +17,17 @@
 package cc.otavia.examples.echo
 
 import cc.otavia.buffer.pool.AdaptiveBuffer
-import cc.otavia.core.actor.ChannelsActor.{Connect, ConnectReply}
+import cc.otavia.core.actor.SocketChannelsActor.{Connect, ConnectChannel, ConnectReply}
 import cc.otavia.core.actor.{ChannelsActor, MainActor, SocketChannelsActor}
 import cc.otavia.core.address.Address
-import cc.otavia.core.channel.{Channel, ChannelHandler, ChannelHandlerContext, ChannelInitializer}
+import cc.otavia.core.channel.*
 import cc.otavia.core.message.{Ask, Reply}
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.stack.helper.{ChannelReplyFutureState, FutureState}
 import cc.otavia.core.stack.{AskStack, ChannelReplyFuture, NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.MessageToByteEncoder
 
-import java.net.InetAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.charset.{Charset, StandardCharsets}
 import scala.language.unsafeNulls
 
@@ -40,22 +40,26 @@ object EchoClient {
 
     private class Main(args: Array[String]) extends MainActor(args) {
 
-        private var clientActor: Address[Connect | Echo] = _
+        private var clientActor: Address[ConnectChannel | Echo] = _
 
         override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
             stack.state match
                 case StackState.start =>
                     clientActor = system.buildActor(() => new ClientActor())
-                    clientActor.ask(Connect(InetAddress.getByName("localhost"), 8080)).suspend()
-                case state: FutureState[ConnectReply] =>
+                    val state = FutureState[ConnectReply](1)
+                    clientActor.ask(ConnectChannel(new InetSocketAddress("localhost", 8080), None), state.future)
+                    state.suspend()
+                case state: FutureState[ConnectReply] if state.id == 1 =>
                     state.future.cause match
                         case Some(value) =>
                             value.printStackTrace()
                             stack.`return`()
                         case None =>
                             println("connected")
-                            clientActor.ask(Echo("hello otavia!")).suspend()
-                case state: FutureState[EchoReply] =>
+                            val state = FutureState[EchoReply](2)
+                            clientActor.ask(Echo("hello otavia!"), state.future)
+                            state.suspend()
+                case state: FutureState[EchoReply] if state.id == 2 =>
                     if (state.future.isSuccess) {
                         println(s"get echo reply: ${state.future.getNow.answer}")
                     }
@@ -63,7 +67,9 @@ object EchoClient {
 
     }
 
-    private class ClientActor extends SocketChannelsActor[Echo] {
+    private class ClientActor extends SocketChannelsActor[Echo | ConnectChannel] {
+
+        private var channel: ChannelAddress = _
 
         override def handler: Option[ChannelInitializer[? <: Channel]] = Some(
           new ChannelInitializer[Channel] {
@@ -71,33 +77,39 @@ object EchoClient {
           }
         )
 
-        override def continueAsk(stack: AskStack[Connect | Echo]): Option[StackState] = {
+        override def continueAsk(stack: AskStack[Echo | ConnectChannel]): Option[StackState] = {
             stack match
-                case s: AskStack[Connect] if s.ask.isInstanceOf[Connect] => connect(s)
-                case s: AskStack[Echo] if s.ask.isInstanceOf[Echo]       => echo(s)
+                case s: AskStack[?] if s.ask.isInstanceOf[Connect] =>
+                    connect(s.asInstanceOf[AskStack[Connect]])
+                case s: AskStack[?] if s.ask.isInstanceOf[Echo] => echo(s.asInstanceOf[AskStack[Echo]])
         }
 
         private def echo(stack: AskStack[Echo]): Option[StackState] = {
             stack.state match
                 case StackState.start =>
-                    val state = new EchoWaitState()
-                    channels.head._2.ask(stack.ask, state.future)
+                    val state = ChannelReplyFutureState()
+                    channel.ask(stack.ask, state.future)
                     state.suspend()
-                case state: EchoWaitState =>
+                case state: ChannelReplyFutureState =>
                     val answer = state.future.getNow.asInstanceOf[String]
                     stack.`return`(EchoReply(answer))
         }
+
+        override protected def afterConnected(channel: ChannelAddress): Unit = this.channel = channel
 
     }
 
     private case class Echo(question: String)    extends Ask[EchoReply]
     private case class EchoReply(answer: String) extends Reply
-
-    private class EchoWaitState extends StackState { val future = ChannelReplyFuture() }
-
+    
     private class ClientHandler extends MessageToByteEncoder {
 
-        override protected def encode(ctx: ChannelHandlerContext, output: AdaptiveBuffer, msg: AnyRef, msgId: Long): Unit =
+        override protected def encode(
+            ctx: ChannelHandlerContext,
+            output: AdaptiveBuffer,
+            msg: AnyRef,
+            msgId: Long
+        ): Unit =
             output.writeCharSequence(msg.asInstanceOf[Echo].question)
 
         override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {

@@ -22,7 +22,7 @@ import cc.otavia.core.actor.AcceptorActor.AcceptedChannel
 import cc.otavia.core.actor.ChannelsActor.*
 import cc.otavia.core.channel.{Channel, ChannelAddress, ChannelHandler, ChannelHandlerContext}
 import cc.otavia.core.message.{Ask, Reply}
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{AskStack, NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.{ByteToMessageCodec, ByteToMessageDecoder}
@@ -45,7 +45,9 @@ object EchoServer {
             stack.state match
                 case StackState.start =>
                     val server = system.buildActor(() => new EchoServer())
-                    server.ask(Bind(8080)).suspend()
+                    val state  = FutureState[BindReply]()
+                    server.ask(Bind(8080), state.future)
+                    state.suspend()
                 case state: FutureState[BindReply] =>
                     println("echo bind port 8080 success")
                     logger.info("echo bind port 8080 success")
@@ -57,7 +59,7 @@ object EchoServer {
 
     private class EchoServerWorker extends AcceptedWorkerActor[Nothing] {
 
-        override protected def init(channel: Channel): Unit = {
+        override protected def initChannel(channel: Channel): Unit = {
             channel.pipeline.addLast(new WorkerHandler())
         }
 
@@ -83,7 +85,12 @@ object EchoServer {
             println(text)
         }
 
-        override protected def encode(ctx: ChannelHandlerContext, output: AdaptiveBuffer, msg: AnyRef, msgId: Long): Unit = {
+        override protected def encode(
+            ctx: ChannelHandlerContext,
+            output: AdaptiveBuffer,
+            msg: AnyRef,
+            msgId: Long
+        ): Unit = {
             output.writeCharSequence(msg.asInstanceOf[String], StandardCharsets.UTF_8)
         }
 

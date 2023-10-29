@@ -20,12 +20,10 @@ import cc.otavia.core.actor.*
 import cc.otavia.core.address.Address
 import cc.otavia.core.ioc.Injectable
 import cc.otavia.core.message.{Ask, Notice, Reply}
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{AskStack, NoticeStack, ReplyFuture, StackState}
 import cc.otavia.core.system.{ActorSystem, ActorThread}
 import cc.otavia.core.timer.TimeoutTrigger
-
-import java.util.concurrent.TimeUnit
 
 object Basic {
 
@@ -49,20 +47,14 @@ object Basic {
 
     private class PingActor(val pongActor: Address[Ping]) extends StateActor[Start] {
 
-        override protected def afterMount(): Unit = {
-            // logger.info("The PingActor has been mounted to ActorSystem.")
-        }
-
         override def continueNotice(stack: NoticeStack[Start]): Option[StackState] = {
             stack.state match
                 case StackState.start =>
-                    val state = new FutureState[Pong]
+                    val state = FutureState[Pong]()
                     pongActor.ask(Ping(), state.future)
-                    // logger.info("Send ping to pongActor")
                     state.suspend()
-                case state: FutureState[Pong] =>
-                    val pong = state.future.getNow
-                    // logger.info(s"Get pong message $pong")
+                case state: FutureState[?] if state.id == 0 =>
+                    val pong = state.future.asInstanceOf[ReplyFuture[Pong]].getNow
                     stack.`return`()
         }
 
@@ -70,12 +62,7 @@ object Basic {
 
     private class PongActor extends StateActor[Ping] {
 
-        override protected def afterMount(): Unit = {
-            // logger.info("PongActor register timeout trigger")
-        }
-
         override def continueAsk(stack: AskStack[Ping]): Option[StackState] = {
-            // logger.info(s"PongActor received ask message ${stack.ask}")
             stack.`return`(Pong())
         }
 

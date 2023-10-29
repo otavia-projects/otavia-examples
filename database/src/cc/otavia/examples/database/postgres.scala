@@ -17,11 +17,11 @@
 package cc.otavia.examples.database
 
 import cc.otavia.core.actor.MainActor
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.actor.SocketChannelsActor.ConnectReply
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
-import cc.otavia.sql.Connection
-import cc.otavia.sql.Connection.Connect
+import cc.otavia.sql.{Authentication, Connection}
 
 private class Main(url: String, username: String, password: String) extends MainActor(Array(url, username, password)) {
     override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
@@ -29,7 +29,9 @@ private class Main(url: String, username: String, password: String) extends Main
             case StackState.start =>
                 val Array(url, username, password) = args
                 val connection                     = system.buildActor(() => new Connection())
-                connection.ask(Connect(url, username, password)).suspend()
+                val state                          = FutureState[ConnectReply]()
+                connection.ask(Authentication(url, username, password), state.future)
+                state.suspend()
             case state: FutureState[?] =>
                 if (!state.future.isSuccess) state.future.causeUnsafe.printStackTrace()
                 stack.`return`()

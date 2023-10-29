@@ -19,7 +19,7 @@ package cc.otavia.examples.http
 import cc.otavia.core.actor.ChannelsActor.{Bind, BindReply}
 import cc.otavia.core.actor.MainActor
 import cc.otavia.core.slf4a.LoggerFactory
-import cc.otavia.core.stack.StackState.FutureState
+import cc.otavia.core.stack.helper.FutureState
 import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.http.server.Router.*
@@ -37,7 +37,9 @@ private class ServerMain() extends MainActor(Array.empty) {
         case StackState.start =>
             val routers = Seq(static("/statics", Path.of("")), plain("/plaintext", "你好 otavia!".getBytes(UTF_8)))
             val server  = system.buildActor(() => new HttpServer(system.actorWorkerSize, routers))
-            server.ask(Bind(port)).suspend()
+            val state   = FutureState[BindReply]()
+            server.ask(Bind(port), state.future)
+            state.suspend()
         case state: FutureState[BindReply] =>
             if (state.future.isFailed) state.future.causeUnsafe.printStackTrace()
             logger.info(s"http server bind port $port success")
