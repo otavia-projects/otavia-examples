@@ -67,7 +67,7 @@ object LifeCycle {
 
         }
 
-        override def continueNotice(stack: NoticeStack[Start]): Option[StackState] =
+        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] =
             // if occurs some error which developer is not catch, this will trigger the actor restart
             // throw new Error("")
             stack.`return`()

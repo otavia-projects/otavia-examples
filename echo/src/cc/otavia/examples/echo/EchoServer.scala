@@ -63,7 +63,7 @@ object EchoServer {
             channel.pipeline.addLast(new WorkerHandler())
         }
 
-        override def continueAsk(stack: AskStack[AcceptedChannel]): Option[StackState] = handleAccepted(stack)
+        override def resumeAsk(stack: AskStack[AcceptedChannel]): Option[StackState] = handleAccepted(stack)
 
         override protected def afterAccepted(channel: ChannelAddress): Unit = {
             println(s"EchoServerWorker accepted ${channel}")

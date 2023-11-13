@@ -22,8 +22,8 @@ import cc.otavia.core.actor.{ChannelsActor, MainActor, SocketChannelsActor}
 import cc.otavia.core.address.Address
 import cc.otavia.core.channel.*
 import cc.otavia.core.message.{Ask, Reply}
-import cc.otavia.core.stack.helper.{ChannelReplyFutureState, FutureState}
-import cc.otavia.core.stack.{AskStack, ChannelReplyFuture, NoticeStack, StackState}
+import cc.otavia.core.stack.helper.{ChannelFutureState, FutureState}
+import cc.otavia.core.stack.{AskStack, ChannelFuture, NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.MessageToByteEncoder
 
@@ -77,7 +77,7 @@ object EchoClient {
           }
         )
 
-        override def continueAsk(stack: AskStack[Echo | ConnectChannel]): Option[StackState] = {
+        override def resumeAsk(stack: AskStack[Echo | ConnectChannel]): Option[StackState] = {
             stack match
                 case s: AskStack[?] if s.ask.isInstanceOf[Connect] =>
                     connect(s.asInstanceOf[AskStack[Connect]])
@@ -87,10 +87,10 @@ object EchoClient {
         private def echo(stack: AskStack[Echo]): Option[StackState] = {
             stack.state match
                 case StackState.start =>
-                    val state = ChannelReplyFutureState()
+                    val state = ChannelFutureState()
                     channel.ask(stack.ask, state.future)
                     state.suspend()
-                case state: ChannelReplyFutureState =>
+                case state: ChannelFutureState =>
                     val answer = state.future.getNow.asInstanceOf[String]
                     stack.`return`(EchoReply(answer))
         }
@@ -101,7 +101,7 @@ object EchoClient {
 
     private case class Echo(question: String)    extends Ask[EchoReply]
     private case class EchoReply(answer: String) extends Reply
-    
+
     private class ClientHandler extends MessageToByteEncoder {
 
         override protected def encode(

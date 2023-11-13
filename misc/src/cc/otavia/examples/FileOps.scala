@@ -22,7 +22,7 @@ import cc.otavia.core.channel.message.FileReadPlan
 import cc.otavia.core.channel.{Channel, ChannelAddress, ChannelHandlerContext}
 import cc.otavia.core.message.*
 import cc.otavia.core.stack.*
-import cc.otavia.core.stack.helper.{ChannelFutureState, ChannelReplyFutureState, FutureState}
+import cc.otavia.core.stack.helper.{ChannelFutureState, FutureState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.*
 import cc.otavia.handler.codec.string.LineSeparator
@@ -68,17 +68,18 @@ object FileOps {
             channel.pipeline.addFirst(new ReadLinesHandler(charset))
         }
 
-        override def continueAsk(stack: AskStack[ReadLines]): Option[StackState] = {
-            stack.state match
+        override def resumeAsk(stack: AskStack[ReadLines]): Option[StackState] = {
+            stack.state match {
                 case StackState.start =>
-                    openFileChannel(file, Seq(StandardOpenOption.READ), attrs = Seq.empty)
-                case openState: ChannelFutureState =>
-                    val linesState = ChannelReplyFutureState()
-                    openState.future.channel.ask(FileReadPlan(-1, -1), linesState.future)
+                    openFileChannelAndSuspend(file, Seq(StandardOpenOption.READ), attrs = Seq.empty)
+                case openState: ChannelFutureState if openState.id == 0 =>
+                    val linesState = ChannelFutureState(1)
+                    val channel    = openState.future.channel
+                    channel.ask(FileReadPlan(-1, -1), linesState.future)
                     linesState.suspend()
-                case linesState: ChannelReplyFutureState =>
+                case linesState: ChannelFutureState if linesState.id == 1 =>
                     stack.`return`(ReadLinesReply(linesState.future.getNow.asInstanceOf[Seq[String]]))
-
+            }
         }
 
     }
@@ -86,7 +87,7 @@ object FileOps {
     private class ReadLinesHandler(charset: Charset) extends ByteToMessageDecoder {
 
         private val lines              = ArrayBuffer.empty[String]
-        private var currentMsgId: Long = -1;
+        private var currentMsgId: Long = -1
 
         override def write(ctx: ChannelHandlerContext, msg: AnyRef, msgId: Long): Unit = {
             msg match

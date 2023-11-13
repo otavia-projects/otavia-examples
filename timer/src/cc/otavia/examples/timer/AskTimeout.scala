@@ -18,7 +18,7 @@ package cc.otavia.examples.timer
 
 import cc.otavia.core.actor.*
 import cc.otavia.core.address.Address
-import cc.otavia.core.message.{Ask, Notice, Reply}
+import cc.otavia.core.message.{Ask, Notice, Reply, TimeoutReply}
 import cc.otavia.core.stack.StackState.start
 import cc.otavia.core.stack.helper.*
 import cc.otavia.core.stack.{AskStack, NoticeStack, StackState}
@@ -39,7 +39,7 @@ object AskTimeout {
 
     private class PingActor(val pongActor: Address[MessageOf[PongActor]]) extends StateActor[Start] {
 
-        override def continueNotice(stack: NoticeStack[Start]): Option[StackState] = {
+        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] = {
             stack.state match
                 case StackState.start =>
                     val state = FutureState[Pong]()
@@ -55,13 +55,13 @@ object AskTimeout {
 
     private class PongActor extends StateActor[Ping] {
 
-        override def continueAsk(stack: AskStack[Ping]): Option[StackState] = {
+        override def resumeAsk(stack: AskStack[Ping]): Option[StackState] = {
             stack.state match
                 case _: StartState =>
-                    val state = TimeoutState()
+                    val state = FutureState[TimeoutReply]()
                     timer.sleepStack(state.future, 2 * 1000) // sleep the current stack 2 seconds
                     state.suspend()
-                case _: TimeoutState =>
+                case _: FutureState[?] =>
                     stack.`return`(Pong())
         }
 

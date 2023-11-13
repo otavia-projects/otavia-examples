@@ -21,7 +21,7 @@ import cc.otavia.core.address.Address
 import cc.otavia.core.ioc.Injectable
 import cc.otavia.core.message.{Ask, Notice, Reply}
 import cc.otavia.core.stack.helper.FutureState
-import cc.otavia.core.stack.{AskStack, NoticeStack, ReplyFuture, StackState}
+import cc.otavia.core.stack.{AskStack, MessageFuture, NoticeStack, StackState}
 import cc.otavia.core.system.{ActorSystem, ActorThread}
 import cc.otavia.core.timer.TimeoutTrigger
 
@@ -47,22 +47,22 @@ object Basic {
 
     private class PingActor(val pongActor: Address[Ping]) extends StateActor[Start] {
 
-        override def continueNotice(stack: NoticeStack[Start]): Option[StackState] = {
-            stack.state match
+        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] =
+            stack.state match {
                 case StackState.start =>
                     val state = FutureState[Pong]()
                     pongActor.ask(Ping(), state.future)
                     state.suspend()
                 case state: FutureState[?] if state.id == 0 =>
-                    val pong = state.future.asInstanceOf[ReplyFuture[Pong]].getNow
+                    val pong = state.future.asInstanceOf[MessageFuture[Pong]].getNow
                     stack.`return`()
-        }
+            }
 
     }
 
     private class PongActor extends StateActor[Ping] {
 
-        override def continueAsk(stack: AskStack[Ping]): Option[StackState] = {
+        override def resumeAsk(stack: AskStack[Ping]): Option[StackState] = {
             stack.`return`(Pong())
         }
 

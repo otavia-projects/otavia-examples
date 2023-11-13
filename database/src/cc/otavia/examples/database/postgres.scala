@@ -23,17 +23,17 @@ import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.sql.{Authentication, Connection}
 
-private class Main(url: String, username: String, password: String) extends MainActor(Array(url, username, password)) {
+private class Main(url: String, username: String, password: String) extends MainActor(Array.empty) {
     override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
         stack.state match
             case StackState.start =>
-                val Array(url, username, password) = args
-                val connection                     = system.buildActor(() => new Connection())
-                val state                          = FutureState[ConnectReply]()
+                val connection = system.buildActor(() => new Connection())
+                val state      = FutureState[ConnectReply]()
                 connection.ask(Authentication(url, username, password), state.future)
                 state.suspend()
             case state: FutureState[?] =>
                 if (!state.future.isSuccess) state.future.causeUnsafe.printStackTrace()
+                else println("connect postgres success!")
                 stack.`return`()
 }
 

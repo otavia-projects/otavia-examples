@@ -17,9 +17,10 @@
 package cc.otavia.examples.timer
 
 import cc.otavia.core.actor.{ChannelsActor, MainActor, SocketChannelsActor}
-import cc.otavia.core.stack.{NoticeStack, StackState, TimeoutEventFuture}
-import cc.otavia.core.system.ActorSystem
+import cc.otavia.core.message.TimeoutReply
 import cc.otavia.core.stack.helper.*
+import cc.otavia.core.stack.{NoticeStack, StackState}
+import cc.otavia.core.system.ActorSystem
 
 object TimeoutInStack {
 
@@ -32,10 +33,10 @@ object TimeoutInStack {
         override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] = {
             stack.state match
                 case StackState.start =>
-                    val state = TimeoutState()
+                    val state = FutureState[TimeoutReply]()
                     timer.sleepStack(state.future, 2000)
                     state.suspend()
-                case state: TimeoutState =>
+                case state: FutureState[?] =>
                     println(s"timeout event reach: ${state.future.getNow}")
                     stack.`return`()
         }

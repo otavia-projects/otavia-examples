@@ -42,7 +42,7 @@ object UnionMessage {
 
     private class PingActor(val pongActor: Address[MessageOf[PongActor]]) extends StateActor[Start] {
 
-        override def continueNotice(stack: NoticeStack[Start]): Option[StackState] = handleStart(stack)
+        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] = handleStart(stack)
 
         private def handleStart(stack: NoticeStack[Start]): Option[StackState] = {
             stack.state match
@@ -70,7 +70,7 @@ object UnionMessage {
 
     private class PongActor extends StateActor[Ping | Hello] {
 
-        override def continueAsk(stack: AskStack[Ping | Hello]): Option[StackState] = stack match
+        override def resumeAsk(stack: AskStack[Ping | Hello]): Option[StackState] = stack match
             case s: AskStack[Ping] if s.ask.isInstanceOf[Ping]   => handlePing(s)
             case s: AskStack[Hello] if s.ask.isInstanceOf[Hello] => handleHello(s)
 
