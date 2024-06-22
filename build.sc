@@ -71,3 +71,10 @@ object misc extends ExampleModule {
     override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.all)
 
 }
+
+object techempower extends ScalaModule {
+
+    override def scalaVersion = "3.3.3"
+
+    override def ivyDeps = Agg(ivy"cc.otavia::otavia-all:0.4.0-SNAPSHOT", ivy"com.lihaoyi::scalatags:0.12.0")
+}
