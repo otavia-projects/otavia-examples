@@ -28,29 +28,19 @@ object ProjectInfo {
     def repository              = github.browsableRepository.get
     def licenses                = Seq(License.`Apache-2.0`)
     def author                  = Seq("Yan Kun <yan_kun_1992@foxmail.com>")
-    def version                 = "0.3.2-SNAPSHOT"
-    def scalaVersion            = "3.3.0"
+    def version                 = "0.4.0-SNAPSHOT"
+    def scalaVersion            = "3.3.3"
     def buildTool               = "mill"
     def buildToolVersion        = main.BuildInfo.millVersion
 
-    def core       = ivy"cc.otavia::otavia-runtime:${version}"
-    def log4a      = ivy"cc.otavia::otavia-log4a:${version}"
-    def codec      = ivy"cc.otavia::otavia-codec:${version}"
-    def codecHttp  = ivy"cc.otavia::otavia-codec-http:${version}"
-    def sql        = ivy"cc.otavia::otavia-sql:${version}"
-    def serde      = ivy"cc.otavia::otavia-serde:${version}"
-    def serdeJson  = ivy"cc.otavia::otavia-serde-json:${version}"
-    def serdeProto = ivy"cc.otavia::otavia-serde-proto:${version}"
-    def mysql      = ivy"cc.otavia::otavia-mysql-driver:${version}"
-    def postgres   = ivy"cc.otavia::otavia-postgres-driver:${version}"
-    def redis      = ivy"cc.otavia::otavia-codec-redis:${version}"
+    def all       = ivy"cc.otavia::otavia-all:${version}"
 
 }
 
 trait ExampleModule extends ScalaModule {
 
     override def scalaVersion = ProjectInfo.scalaVersion
-    override def ivyDeps      = Agg(ProjectInfo.core, ProjectInfo.log4a)
+    override def ivyDeps      = Agg(ProjectInfo.all)
 
 }
 
@@ -58,19 +48,19 @@ object basic extends ExampleModule
 
 object `http-server` extends ExampleModule {
 
-    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.codecHttp)
+    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.all)
 
 }
 
 object database extends ExampleModule {
 
-    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.mysql, ProjectInfo.postgres, ProjectInfo.redis)
+    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.all)
 
 }
 
 object echo extends ExampleModule {
 
-    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.core, ProjectInfo.codec)
+    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.all)
 
 }
 
@@ -78,6 +68,6 @@ object timer extends ExampleModule
 
 object misc extends ExampleModule {
 
-    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.codec)
+    override def ivyDeps = super.ivyDeps() ++ Agg(ProjectInfo.all)
 
 }

@@ -19,10 +19,10 @@ package cc.otavia.examples.basic
 import cc.otavia.core.actor.{MessageOf, StateActor}
 import cc.otavia.core.address.Address
 import cc.otavia.core.message.{Ask, Notice, Reply}
-import cc.otavia.core.stack.StackState.start
-import cc.otavia.core.stack.helper.FutureState
+import cc.otavia.core.stack.helper.{FutureState, StartState}
 import cc.otavia.core.stack.{AskStack, NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
+import cc.otavia.core.stack.StackYield
 
 object UnionMessage {
 
@@ -42,19 +42,19 @@ object UnionMessage {
 
     private class PingActor(val pongActor: Address[MessageOf[PongActor]]) extends StateActor[Start] {
 
-        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] = handleStart(stack)
+        override def resumeNotice(stack: NoticeStack[Start]): StackYield = handleStart(stack)
 
-        private def handleStart(stack: NoticeStack[Start]): Option[StackState] = {
+        private def handleStart(stack: NoticeStack[Start]): StackYield = {
             stack.state match
-                case StackState.start =>
+                case _: StartState =>
                     if (stack.notice.toggle) {
                         val state = FutureState[World](0)
                         pongActor.ask(Hello(), state.future)
-                        state.suspend()
+                        stack.suspend(state)
                     } else {
                         val state = FutureState[Pong](1)
                         pongActor.ask(Ping(), state.future)
-                        state.suspend()
+                        stack.suspend(state)
                     }
                 case state: FutureState[World] if state.id == 0 =>
                     val world = state.future.getNow
@@ -70,15 +70,15 @@ object UnionMessage {
 
     private class PongActor extends StateActor[Ping | Hello] {
 
-        override def resumeAsk(stack: AskStack[Ping | Hello]): Option[StackState] = stack match
+        override def resumeAsk(stack: AskStack[Ping | Hello]): StackYield = stack match
             case s: AskStack[Ping] if s.ask.isInstanceOf[Ping]   => handlePing(s)
             case s: AskStack[Hello] if s.ask.isInstanceOf[Hello] => handleHello(s)
 
-        private def handlePing(stack: AskStack[Ping]): Option[StackState] = {
+        private def handlePing(stack: AskStack[Ping]): StackYield = {
             stack.`return`(Pong())
         }
 
-        private def handleHello(stack: AskStack[Hello]): Option[StackState] = {
+        private def handleHello(stack: AskStack[Hello]): StackYield = {
             stack.`return`(World())
         }
 

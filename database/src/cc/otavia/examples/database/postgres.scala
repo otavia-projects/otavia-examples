@@ -16,21 +16,21 @@
 
 package cc.otavia.examples.database
 
+import cc.otavia.core.actor.ChannelsActor.ChannelEstablished
 import cc.otavia.core.actor.MainActor
-import cc.otavia.core.actor.SocketChannelsActor.ConnectReply
-import cc.otavia.core.stack.helper.FutureState
-import cc.otavia.core.stack.{NoticeStack, StackState}
+import cc.otavia.core.stack.helper.{FutureState, StartState}
+import cc.otavia.core.stack.{NoticeStack, StackState, StackYield}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.sql.{Authentication, Connection}
 
 private class Main(url: String, username: String, password: String) extends MainActor(Array.empty) {
-    override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
+    override def main0(stack: NoticeStack[MainActor.Args]): StackYield =
         stack.state match
-            case StackState.start =>
+            case _: StartState =>
                 val connection = system.buildActor(() => new Connection())
-                val state      = FutureState[ConnectReply]()
+                val state      = FutureState[ChannelEstablished]()
                 connection.ask(Authentication(url, username, password), state.future)
-                state.suspend()
+                stack.suspend(state)
             case state: FutureState[?] =>
                 if (!state.future.isSuccess) state.future.causeUnsafe.printStackTrace()
                 else println("connect postgres success!")

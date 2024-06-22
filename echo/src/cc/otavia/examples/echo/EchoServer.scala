@@ -22,8 +22,8 @@ import cc.otavia.core.actor.AcceptorActor.AcceptedChannel
 import cc.otavia.core.actor.ChannelsActor.*
 import cc.otavia.core.channel.{Channel, ChannelAddress, ChannelHandler, ChannelHandlerContext}
 import cc.otavia.core.message.{Ask, Reply}
-import cc.otavia.core.stack.helper.FutureState
-import cc.otavia.core.stack.{AskStack, NoticeStack, StackState}
+import cc.otavia.core.stack.helper.{FutureState, StartState}
+import cc.otavia.core.stack.{AskStack, NoticeStack, StackYield}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.{ByteToMessageCodec, ByteToMessageDecoder}
 
@@ -41,14 +41,14 @@ object EchoServer {
     }
 
     private class Main(args: Array[String]) extends MainActor(args) {
-        override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] = {
+        override def main0(stack: NoticeStack[MainActor.Args]): StackYield = {
             stack.state match
-                case StackState.start =>
+                case _: StartState =>
                     val server = system.buildActor(() => new EchoServer())
-                    val state  = FutureState[BindReply]()
+                    val state  = FutureState[ChannelEstablished]()
                     server.ask(Bind(8080), state.future)
-                    state.suspend()
-                case state: FutureState[BindReply] =>
+                    stack.suspend(state)
+                case state: FutureState[ChannelEstablished] =>
                     println("echo bind port 8080 success")
                     logger.info("echo bind port 8080 success")
                     stack.`return`()
@@ -63,7 +63,7 @@ object EchoServer {
             channel.pipeline.addLast(new WorkerHandler())
         }
 
-        override def resumeAsk(stack: AskStack[AcceptedChannel]): Option[StackState] = handleAccepted(stack)
+        override def resumeAsk(stack: AskStack[AcceptedChannel]): StackYield = handleAccepted(stack)
 
         override protected def afterAccepted(channel: ChannelAddress): Unit = {
             println(s"EchoServerWorker accepted ${channel}")

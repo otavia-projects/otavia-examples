@@ -22,7 +22,7 @@ import cc.otavia.core.channel.message.FileReadPlan
 import cc.otavia.core.channel.{Channel, ChannelAddress, ChannelHandlerContext}
 import cc.otavia.core.message.*
 import cc.otavia.core.stack.*
-import cc.otavia.core.stack.helper.{ChannelFutureState, FutureState}
+import cc.otavia.core.stack.helper.{ChannelFutureState, FutureState, StartState}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.handler.codec.*
 import cc.otavia.handler.codec.string.LineSeparator
@@ -42,12 +42,12 @@ object FileOps {
 
         system.buildActor(() =>
             new MainActor(args) {
-                override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
+                override def main0(stack: NoticeStack[MainActor.Args]): StackYield =
                     stack.state match
-                        case StackState.start =>
+                        case _: StartState =>
                             val state = FutureState[ReadLinesReply]()
                             fileChannelActor.ask(ReadLines(), state.future)
-                            state.suspend()
+                            stack.suspend(state)
                         case futureState: FutureState[ReadLinesReply] =>
                             for (elem <- futureState.future.getNow.lines) {
                                 print(elem)
@@ -68,15 +68,15 @@ object FileOps {
             channel.pipeline.addFirst(new ReadLinesHandler(charset))
         }
 
-        override def resumeAsk(stack: AskStack[ReadLines]): Option[StackState] = {
+        override def resumeAsk(stack: AskStack[ReadLines]): StackYield = {
             stack.state match {
-                case StackState.start =>
-                    openFileChannelAndSuspend(file, Seq(StandardOpenOption.READ), attrs = Seq.empty)
+                case _: StartState =>
+                    stack.suspend(openFile(file, Seq(StandardOpenOption.READ), attrs = Seq.empty))
                 case openState: ChannelFutureState if openState.id == 0 =>
                     val linesState = ChannelFutureState(1)
                     val channel    = openState.future.channel
                     channel.ask(FileReadPlan(-1, -1), linesState.future)
-                    linesState.suspend()
+                    stack.suspend(linesState)
                 case linesState: ChannelFutureState if linesState.id == 1 =>
                     stack.`return`(ReadLinesReply(linesState.future.getNow.asInstanceOf[Seq[String]]))
             }

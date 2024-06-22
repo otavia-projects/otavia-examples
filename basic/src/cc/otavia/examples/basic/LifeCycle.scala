@@ -22,6 +22,7 @@ import cc.otavia.core.stack.{NoticeStack, StackState}
 import cc.otavia.core.system.ActorSystem
 
 import scala.language.unsafeNulls
+import cc.otavia.core.stack.StackYield
 
 object LifeCycle {
 
@@ -67,7 +68,7 @@ object LifeCycle {
 
         }
 
-        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] =
+        override def resumeNotice(stack: NoticeStack[Start]): StackYield =
             // if occurs some error which developer is not catch, this will trigger the actor restart
             // throw new Error("")
             stack.`return`()

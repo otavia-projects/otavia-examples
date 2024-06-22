@@ -16,27 +16,34 @@
 
 package cc.otavia.examples.database
 
-import cc.otavia.core.actor.SocketChannelsActor.ConnectReply
-import cc.otavia.core.actor.{ChannelsActor, MainActor, SocketChannelsActor}
-import cc.otavia.core.stack.StackState.start
-import cc.otavia.core.stack.helper.FutureState
-import cc.otavia.core.stack.{NoticeStack, StackState}
+import cc.otavia.core.actor.ChannelsActor.ChannelEstablished
+import cc.otavia.core.actor.{ChannelsActor, MainActor, MessageOf, SocketChannelsActor}
+import cc.otavia.core.address.Address
+import cc.otavia.core.stack.helper.{FutureState, StartState}
+import cc.otavia.core.stack.{NoticeStack, StackYield}
 import cc.otavia.core.system.ActorSystem
-import cc.otavia.sql.{Authentication, Connection}
+import cc.otavia.sql.Statement.ModifyRows
+import cc.otavia.sql.{Authentication, Connection, Statement}
 
-@main def start(url: String, username: String, password: String): Unit =
-    val system = ActorSystem()
-    system.buildActor(() =>
-        new MainActor(Array.empty) {
-            override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] = stack.state match
-                case StackState.start =>
-                    val connection = this.system.buildActor(() => new Connection())
-                    val state      = FutureState[ConnectReply]()
+@main def mysql(url: String, username: String, password: String): Unit =
+    val sys = ActorSystem()
+    sys.buildActor(() =>
+        new MainActor() {
+            private var connection: Address[MessageOf[Connection]] = _
+            override def main0(stack: NoticeStack[MainActor.Args]): StackYield = stack.state match
+                case _: StartState =>
+                    connection = this.system.buildActor(() => new Connection())
+                    val state = FutureState[ChannelEstablished](0)
                     connection.ask(Authentication(url, username, password), state.future)
-                    state.suspend()
+                    stack.suspend(state)
                 case state: FutureState[?] =>
-                    if (!state.future.isSuccess)
-                        state.future.causeUnsafe.printStackTrace()
+                    val newState = FutureState[ModifyRows](1)
+                    connection.ask(
+                      Statement.ExecuteUpdate("insert into test(id, double_id, str_id) values (1, 2, '1')"),
+                      newState.future
+                    )
+                    stack.suspend(newState)
+                case state: FutureState[ModifyRows] if state.id == 1 =>
                     stack.`return`()
         }
     )

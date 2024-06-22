@@ -16,11 +16,12 @@
 
 package cc.otavia.examples.database
 
-import cc.otavia.core.actor.SocketChannelsActor.{ConnectChannel, ConnectReply}
+import cc.otavia.core.actor.ChannelsActor.ChannelEstablished
+import cc.otavia.core.actor.SocketChannelsActor.ConnectChannel
 import cc.otavia.core.actor.{MainActor, MessageOf}
 import cc.otavia.core.address.Address
-import cc.otavia.core.stack.helper.FutureState
-import cc.otavia.core.stack.{NoticeStack, StackState}
+import cc.otavia.core.stack.helper.{FutureState, StartState}
+import cc.otavia.core.stack.{NoticeStack, StackState, StackYield}
 import cc.otavia.core.system.ActorSystem
 import cc.otavia.redis.Client
 import cc.otavia.redis.cmd.{Auth, OK}
@@ -34,18 +35,18 @@ private class MainRedis(host: String, port: Int, password: String, database: Int
 
     private var client: Address[MessageOf[Client]] = _
 
-    override def main0(stack: NoticeStack[MainActor.Args]): Option[StackState] =
+    override def main0(stack: NoticeStack[MainActor.Args]): StackYield =
         stack.state match
-            case StackState.start =>
+            case _: StartState =>
                 client = system.buildActor(() => new Client())
-                val state = FutureState[ConnectReply]()
+                val state = FutureState[ChannelEstablished]()
                 client.ask(ConnectChannel(new InetSocketAddress(host, port), None), state.future)
-                state.suspend()
-            case state: FutureState[ConnectReply] if state.id == 0 =>
+                stack.suspend(state)
+            case state: FutureState[ChannelEstablished] if state.id == 0 =>
                 logger.info("redis connected")
                 val state = FutureState[OK]()
                 client.ask(Auth(password), state.future)
-                state.suspend()
+                stack.suspend(state)
             case state: FutureState[OK] =>
                 if (state.future.isFailed) state.future.causeUnsafe.printStackTrace()
                 stack.`return`()

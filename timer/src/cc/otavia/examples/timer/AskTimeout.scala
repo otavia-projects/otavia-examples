@@ -19,9 +19,8 @@ package cc.otavia.examples.timer
 import cc.otavia.core.actor.*
 import cc.otavia.core.address.Address
 import cc.otavia.core.message.{Ask, Notice, Reply, TimeoutReply}
-import cc.otavia.core.stack.StackState.start
 import cc.otavia.core.stack.helper.*
-import cc.otavia.core.stack.{AskStack, NoticeStack, StackState}
+import cc.otavia.core.stack.{AskStack, NoticeStack, StackYield}
 import cc.otavia.core.system.ActorSystem
 
 object AskTimeout {
@@ -39,12 +38,12 @@ object AskTimeout {
 
     private class PingActor(val pongActor: Address[MessageOf[PongActor]]) extends StateActor[Start] {
 
-        override def resumeNotice(stack: NoticeStack[Start]): Option[StackState] = {
+        override def resumeNotice(stack: NoticeStack[Start]): StackYield = {
             stack.state match
-                case StackState.start =>
+                case _: StartState =>
                     val state = FutureState[Pong]()
                     pongActor.ask(Ping(), state.future, 1000) // max timeout time: 1000 millis
-                    state.suspend()
+                    stack.suspend(state)
                 case state: FutureState[Pong] =>
                     val timeout = state.future.isTimeout
                     println(s"timeout ${timeout}")
@@ -55,12 +54,12 @@ object AskTimeout {
 
     private class PongActor extends StateActor[Ping] {
 
-        override def resumeAsk(stack: AskStack[Ping]): Option[StackState] = {
+        override def resumeAsk(stack: AskStack[Ping]): StackYield = {
             stack.state match
                 case _: StartState =>
                     val state = FutureState[TimeoutReply]()
                     timer.sleepStack(state.future, 2 * 1000) // sleep the current stack 2 seconds
-                    state.suspend()
+                    stack.suspend(state)
                 case _: FutureState[?] =>
                     stack.`return`(Pong())
         }
