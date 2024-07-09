@@ -17,6 +17,7 @@ class FortuneController extends StateActor[FortuneRequest] {
 
     override protected def afterMount(): Unit = connection = autowire[Connection]()
 
+    //  Test 4: Fortunes
     override protected def resumeAsk(stack: AskStack[FortuneRequest]): StackYield = {
         stack.state match
             case _: StartState =>

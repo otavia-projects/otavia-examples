@@ -28,7 +28,7 @@ object ProjectInfo {
     def repository              = github.browsableRepository.get
     def licenses                = Seq(License.`Apache-2.0`)
     def author                  = Seq("Yan Kun <yan_kun_1992@foxmail.com>")
-    def version                 = "0.4.0-SNAPSHOT"
+    def version                 = "0.4.0"
     def scalaVersion            = "3.3.3"
     def buildTool               = "mill"
     def buildToolVersion        = main.BuildInfo.millVersion
@@ -76,5 +76,5 @@ object techempower extends ScalaModule {
 
     override def scalaVersion = "3.3.3"
 
-    override def ivyDeps = Agg(ivy"cc.otavia::otavia-all:0.4.0-SNAPSHOT", ivy"com.lihaoyi::scalatags:0.12.0")
+    override def ivyDeps = Agg(ProjectInfo.all, ivy"com.lihaoyi::scalatags:0.12.0")
 }

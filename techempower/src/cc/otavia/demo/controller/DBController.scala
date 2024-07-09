@@ -21,15 +21,12 @@ class DBController extends StateActor[REQ] {
 
     override protected def afterMount(): Unit = connection = autowire[Connection]()
 
-    override protected def resumeAsk(stack: AskStack[REQ & Ask[? <: Reply]]): StackYield =
-        stack match
-            case stack: AskStack[SingleQueryRequest] if stack.ask.isInstanceOf[SingleQueryRequest] =>
-                handleSingleQuery(stack)
-            case stack: AskStack[MultipleQueryRequest] if stack.ask.isInstanceOf[MultipleQueryRequest] =>
-                handleMultipleQuery(stack)
-            case stack: AskStack[UpdateRequest] if stack.ask.isInstanceOf[UpdateRequest] =>
-                handleUpdateQuery(stack)
+    override protected def resumeAsk(stack: AskStack[REQ & Ask[? <: Reply]]): StackYield = stack.ask match
+        case _: SingleQueryRequest   => handleSingleQuery(stack.asInstanceOf[AskStack[SingleQueryRequest]])
+        case _: MultipleQueryRequest => handleMultipleQuery(stack.asInstanceOf[AskStack[MultipleQueryRequest]])
+        case _: UpdateRequest        => handleUpdateQuery(stack.asInstanceOf[AskStack[UpdateRequest]])
 
+    // Test 2: Single database query
     private def handleSingleQuery(stack: AskStack[SingleQueryRequest]): StackYield = {
         stack.state match
             case _: StartState =>
@@ -40,6 +37,7 @@ class DBController extends StateActor[REQ] {
                 stack.`return`(state.future.getNow)
     }
 
+    // Test 3: Multiple database queries
     private def handleMultipleQuery(stack: AskStack[MultipleQueryRequest]): StackYield = {
         stack.state match
             case _: StartState =>
@@ -49,6 +47,7 @@ class DBController extends StateActor[REQ] {
                 stack.`return`(response)
     }
 
+    // Test 5: Database updates
     private def handleUpdateQuery(stack: AskStack[UpdateRequest]): StackYield = {
         stack.state match
             case _: StartState =>

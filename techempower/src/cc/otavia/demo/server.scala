@@ -26,31 +26,21 @@ private class ServerMain(val port: Int = 8080) extends MainActor(Array.empty) {
 
     override def main0(stack: NoticeStack[MainActor.Args]): StackYield = stack.state match
         case _: StartState =>
-            val singleQueryRequestFactory = new HttpRequestFactory() {
-                override def createHttpRequest(): HttpRequest[?, ?] = new SingleQueryRequest()
-            }
-            val multipleQueryRequestFactory = new HttpRequestFactory() {
-                override def createHttpRequest(): HttpRequest[?, ?] = new MultipleQueryRequest()
-            }
-            val updateRequestFactory = new HttpRequestFactory() {
-                override def createHttpRequest(): HttpRequest[?, ?] = new UpdateRequest()
-            }
-            val fortuneRequestFactory = new HttpRequestFactory {
-                override def createHttpRequest(): HttpRequest[?, ?] = new FortuneRequest()
-            }
-            val fortunesResponseSerde = new HttpResponseSerde[String](StringSerde.utf8, MediaType.TEXT_HTML_UTF8)
-            val worldResponseSerde    = new HttpResponseSerde[World](summon[JsonSerde[World]], MediaType.APP_JSON)
-            val worldsResponseSerde =
-                new HttpResponseSerde[Seq[World]](JsonSerde.derived[Seq[World]], MediaType.APP_JSON)
+            val worldResponseSerde  = HttpResponseSerde.json(summon[JsonSerde[World]])
+            val worldsResponseSerde = HttpResponseSerde.json(JsonSerde.derived[Seq[World]])
+
             val dbController      = autowire[DBController]()
             val fortuneController = autowire[FortuneController]()
+
             val routers = Seq(
+              // Test 6: plaintext
               constant[Array[Byte]](GET, "/plaintext", "Hello, World!".getBytes(UTF_8), BytesSerde, TEXT_PLAIN_UTF8),
+              // Test 1: JSON serialization
               constant[Message](GET, "/json", Message("Hello, World!"), summon[JsonSerde[Message]], APP_JSON),
-              get("/db", dbController, singleQueryRequestFactory, worldResponseSerde),
-              get("/queries", dbController, multipleQueryRequestFactory, worldsResponseSerde),
-              get("/updates", dbController, updateRequestFactory, worldsResponseSerde),
-              get("/fortunes", fortuneController, fortuneRequestFactory, fortunesResponseSerde)
+              get("/db", dbController, () => new SingleQueryRequest(), worldResponseSerde),
+              get("/queries", dbController, () => new MultipleQueryRequest(), worldsResponseSerde),
+              get("/updates", dbController, () => new UpdateRequest(), worldsResponseSerde),
+              get("/fortunes", fortuneController, () => new FortuneRequest(), HttpResponseSerde.stringHtml)
             )
             val server = system.buildActor(() => new HttpServer(system.actorWorkerSize, routers))
             val state  = FutureState[ChannelEstablished]()
